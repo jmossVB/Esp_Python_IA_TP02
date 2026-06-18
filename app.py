@@ -97,7 +97,8 @@ with st.sidebar:
 
 
 
-
+if "df" not in st.session_state:
+    st.session_state.df = None
 
 
 
