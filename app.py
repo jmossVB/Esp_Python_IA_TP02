@@ -172,7 +172,7 @@ if modulo == "🏠 Home":
     col1, col2, col3 = st.columns([1, 2, 2])
  
     with col1:
-        st.image("https://img.icons8.com/fluency/200/bank.png", width=160)
+        st.image("jmosquera.jpeg", width=200)
  
     with col2:
         st.markdown("### 👤 Información Personal")
