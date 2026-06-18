@@ -142,6 +142,7 @@ st.markdown("""
 with st.sidebar:
     st.markdown("## 🏦 Bank Marketing EDA")
     st.markdown("---")
+    st.sidebar.image("DMC.png")
     modulo = st.selectbox(
         "📂 Módulo:",
         [
