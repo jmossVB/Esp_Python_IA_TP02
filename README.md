@@ -71,7 +71,7 @@ Se implementó la clase `DataAnalyzer` que encapsula:
 ## 📊 Dataset
 
 **BankMarketing.csv** — Dataset de campaña de marketing de una institución financiera.
-- ~4,500 registros | 21 variables
+- ~41,188 registros | 21 variables
 - Variable objetivo: `y` (aceptó la campaña: yes/no)
 
 ---
