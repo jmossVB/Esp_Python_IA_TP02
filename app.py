@@ -40,3 +40,11 @@ class DataAnalyzer:
 
     def comparacion_grupos(self, num_col: str, cat_col: str) -> pd.DataFrame:
         return self.df.groupby(cat_col)[num_col].describe()
+
+
+st.set_page_config(
+    page_title="Bank Marketing EDA",
+    page_icon="🏦",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
