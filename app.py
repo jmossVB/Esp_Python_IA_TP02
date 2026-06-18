@@ -48,3 +48,41 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+
+st.markdown("""
+<style>
+    [data-testid="stSidebar"] {background-color: #0d1b2a;}
+    [data-testid="stSidebar"] * {color: #e0e6ef !important;}
+    .main-title {font-size:2.2rem; font-weight:800; color:#1a73e8; margin-bottom:0;}
+    .sub-title  {font-size:1rem;   color:#6c757d; margin-top:0;}
+    .metric-card {
+        background: #f0f4ff;
+        border-left: 4px solid #1a73e8;
+        padding: 0.8rem 1rem;
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+    }
+    .insight-box {
+        background: #fff8e1;
+        border-left: 4px solid #f9a825;
+        padding: 0.8rem 1rem;
+        border-radius: 6px;
+        margin: 0.5rem 0;
+    }
+    .conclusion-box {
+        background: #e8f5e9;
+        border-left: 4px solid #2e7d32;
+        padding: 0.8rem 1rem;
+        border-radius: 6px;
+        margin: 0.5rem 0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
+
+
+
+
+
