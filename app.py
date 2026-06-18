@@ -103,6 +103,57 @@ if "df" not in st.session_state:
 
 
 
+# ════════════════════════════════════════════════════════════
+# MÓDULO 1 – HOME
+# ════════════════════════════════════════════════════════════
+if modulo == "🏠 Home":
+    st.markdown('<p class="main-title">🏦 Análisis Exploratorio de Datos</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Dataset: Bank Marketing Campaign · Institución Financiera</p>', unsafe_allow_html=True)
+    st.markdown("---")
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.markdown("### 🎯 Objetivo del Análisis")
+        st.markdown("""
+        Este proyecto realiza un **Análisis Exploratorio de Datos (EDA)** sobre el dataset
+        **BankMarketing.csv**, correspondiente a una institución financiera que busca entender
+        los factores que influyen en la aceptación de sus campañas de marketing.
+
+        Durante los últimos 6 meses, la efectividad cayó del **12 % al 8 %**, afectando
+        los bonos de los ejecutivos comerciales. La tarea consiste en analizar los datos
+        de la última campaña para **descubrir relaciones y comportamientos relevantes**
+        entre las variables.
+        """)
+
+        st.markdown("### 👤 Datos del Autor")
+        st.markdown("""
+        | Campo | Detalle |
+        |---|---|
+        | **Nombre completo** | Estudiante Analítica |
+        | **Curso / Especialización** | Especialización en Python for Analytics |
+        | **Año** | 2026 |
+        """)
+
+    with col2:
+        st.markdown("### 📋 Sobre el Dataset")
+        st.markdown("""
+        <div class="metric-card">
+        <b>Fuente:</b> Institución Financiera<br>
+        <b>Registros:</b> ~4 500 clientes<br>
+        <b>Variables:</b> 21 columnas<br>
+        <b>Variable objetivo:</b> <code>y</code> (aceptó la campaña)
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("### 🛠️ Tecnologías")
+        techs = ["Python 3.x", "Pandas", "NumPy", "Matplotlib", "Seaborn", "Streamlit"]
+        for t in techs:
+            st.markdown(f"✅ {t}")
+
+    st.markdown("---")
+    st.info("👈 Usa el menú lateral para navegar entre módulos. Comienza cargando el dataset.")
+
 
 
 
