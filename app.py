@@ -82,6 +82,26 @@ st.markdown("""
 
 
 
+with st.sidebar:
+    st.image("https://img.icons8.com/fluency/96/bank.png", width=70)
+    st.markdown("## 🏦 Bank Marketing EDA")
+    st.markdown("---")
+    modulo = st.selectbox(
+        "📂 Navegar a:",
+        ["🏠 Home", "📂 Carga del Dataset", "🔍 Análisis EDA", "✅ Conclusiones"],
+    )
+    st.markdown("---")
+    st.markdown("**Tecnologías utilizadas:**")
+    st.markdown("🐍 Python · 🐼 Pandas · 📊 Seaborn")
+    st.markdown("📈 Matplotlib · 🚀 Streamlit · 🔢 NumPy")
+
+
+
+
+
+
+
+
 
 
 
