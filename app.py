@@ -160,55 +160,31 @@ with st.sidebar:
 if "df" not in st.session_state:
     st.session_state.df = None
 
+
 # ═══════════════════════════════════════════════════════════════
 # MÓDULO 1 – HOME  (solo contextualiza, NO realiza análisis)
 # ═══════════════════════════════════════════════════════════════
 if modulo == "🏠 Home":
     st.title("🏦 Análisis Exploratorio de Datos — Bank Marketing")
-    st.caption("Dataset: BankMarketing.csv · Institución Financiera")
+    st.subheader("Especialización en Python for Analytics · Caso de Estudio N°1 — BankMarketing")
     st.markdown("---")
-
-    col1, col2 = st.columns([2, 1])
-
+ 
+    col1, col2, col3 = st.columns([1, 2, 2])
+ 
     with col1:
-        st.markdown("### 🎯 Objetivo del análisis")
-        st.markdown("""
-        Este proyecto desarrolla una **aplicación interactiva con Streamlit** orientada al
-        **Análisis Exploratorio de Datos (EDA)** del dataset **BankMarketing.csv**,
-        correspondiente a una institución financiera que busca entender los factores que
-        influyen en la aceptación de sus campañas de marketing.
-
-        Durante los últimos 6 meses, la efectividad *(e = Ventas/Base × 100%)* cayó del
-        **12 % al 8 %**, afectando los bonos de los ejecutivos comerciales.
-        La tarea consiste en analizar los datos de la última campaña para **descubrir
-        relaciones y comportamientos relevantes** entre las variables.
-
-        > ⚠️ El objetivo **NO es construir modelos predictivos**, sino aplicar de manera
-        integrada los conceptos vistos en el curso para desarrollar una herramienta
-        funcional, clara y bien estructurada.
-        """)
-
-        st.markdown("### 👤 Datos del autor")
-        st.markdown("""
-        | Campo | Detalle |
-        |---|---|
-        | **Nombre completo** | Estudiante — Especialización Python for Analytics |
-        | **Curso / Especialización** | Especialización en Python for Analytics |
-        | **Año** | 2026 |
-        """)
-
-        st.markdown("### 📄 Breve explicación del dataset")
-        st.markdown("""
-        El archivo **BankMarketing.csv** contiene registros de clientes de una institución
-        bancaria contactados en una campaña de marketing telefónico. Incluye información
-        demográfica (edad, trabajo, estado civil, educación), datos de la campaña
-        (canal, mes, duración) e indicadores macroeconómicos (euribor, índice de empleo,
-        confianza del consumidor). La variable objetivo `y` indica si el cliente aceptó
-        o no el producto ofrecido.
-        """)
-
+        st.image("https://img.icons8.com/fluency/200/bank.png", width=160)
+ 
     with col2:
-        st.markdown("### 📋 Resumen del dataset")
+        st.markdown("### 👤 Información Personal")
+        st.write("**Nombre:** Estudiante — Especialización Python for Analytics")
+        st.write("**Especialización:** Python for Analytics")
+        st.write("**Año:** 2026")
+        st.markdown("---")
+        st.markdown("**Instructor:** MSc. Carlos Carrillo Villavicencio")
+ 
+    with col3:
+        st.markdown("Especialización en Python for Analytics")
+        st.info("Caso de Estudio N°1 — Bank Marketing EDA")
         st.markdown("""
         <div class="card-azul">
         <b>Fuente:</b> Institución Financiera<br>
@@ -217,18 +193,50 @@ if modulo == "🏠 Home":
         <b>Variable objetivo:</b> <code>y</code> (yes / no)
         </div>
         """, unsafe_allow_html=True)
-
-        st.markdown("### 🛠️ Tecnologías utilizadas")
-        techs = {
-            "Tecnología": ["Python 3.x", "Streamlit", "Pandas", "NumPy", "Matplotlib", "Seaborn"],
-            "Uso": ["Lenguaje base", "Interfaz interactiva", "Manipulación de datos",
-                    "Cálculos numéricos", "Visualizaciones", "Gráficas estadísticas"],
-        }
-        st.dataframe(pd.DataFrame(techs), use_container_width=True, hide_index=True)
-
+ 
+    st.markdown("### 📋 Descripción del proyecto")
+    st.markdown("""
+    Este proyecto desarrolla una **aplicación interactiva construida en Python utilizando Streamlit**,
+    orientada al **Análisis Exploratorio de Datos (EDA)** del dataset **BankMarketing.csv**,
+    correspondiente a una institución financiera que busca entender los factores que influyen
+    en la aceptación de sus campañas de marketing.
+ 
+    Durante los últimos 6 meses, la efectividad *(e = Ventas/Base × 100%)* cayó del **12 % al 8 %**,
+    afectando los bonos de los ejecutivos comerciales. La tarea consiste en analizar los datos de la
+    última campaña para **descubrir relaciones y comportamientos relevantes** entre las variables.
+ 
+    > ⚠️ El objetivo **NO es construir modelos predictivos**, sino aplicar de manera integrada
+    los conceptos vistos a lo largo del curso, desarrollando una herramienta funcional, clara
+    y bien estructurada, similar a un producto analítico real.
+ 
+    La aplicación integra los siguientes conceptos fundamentales:
+    - **Variables y tipos de datos · Funciones · f-strings**
+    - **Programación Orientada a Objetos (POO)** — clase `DataAnalyzer`
+    - **NumPy y Pandas** — manipulación y análisis de datos
+    - **Visualización con Matplotlib y Seaborn**
+    - **Estadística descriptiva** — media, mediana, moda, dispersión
+    """)
+ 
+    st.markdown("---")
+ 
+    st.markdown("### 🛠️ Tecnologías utilizadas")
+    tech = {
+        "Tecnología": ["Python 3.x", "Streamlit", "Pandas", "NumPy", "Matplotlib", "Seaborn"],
+        "Uso": [
+            "Lenguaje base",
+            "Interfaz interactiva (sidebar, tabs, columns, widgets)",
+            "Manipulación y análisis de datos",
+            "Cálculos numéricos y arrays",
+            "Visualizaciones estadísticas base",
+            "Gráficas estadísticas avanzadas",
+        ],
+    }
+    st.dataframe(pd.DataFrame(tech), use_container_width=True, hide_index=True)
+ 
     st.markdown("---")
     st.info("👈 Navega usando el menú lateral. **Empieza cargando el dataset en 📂 Carga del Dataset.**")
-
+ 
+ 
 
 # ═══════════════════════════════════════════════════════════════
 # MÓDULO 2 – CARGA DEL DATASET
