@@ -1,599 +1,624 @@
-import streamlit as st
-import pandas as pd
+"""
+Caso de Estudio N°1 – BankMarketing EDA
+Especialización Python for Analytics | DMC Institute
+"""
+
+import io
 import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-from io import StringIO
+import streamlit as st
 
+st.set_page_config(page_title="BankMarketing EDA", layout="wide")
+
+
+# ─────────────────────────────────────────────
+# CLASE PRINCIPAL  (POO)
+# ─────────────────────────────────────────────
 class DataAnalyzer:
-    """Encapsula estadísticas descriptivas, clasificación de variables y visualizaciones."""
+    """Encapsula estadísticas descriptivas, clasificación de variables
+    y helpers de visualización para un DataFrame de Pandas."""
 
     def __init__(self, df: pd.DataFrame):
-        self.df = df
+        self.df = df.copy()
 
-    def clasificar_variables(self) -> dict:
-        """Función personalizada que clasifica variables en numéricas y categóricas."""
-        numericas = self.df.select_dtypes(include=[np.number]).columns.tolist()
-        categoricas = self.df.select_dtypes(include=["object", "category"]).columns.tolist()
-        return {"numericas": numericas, "categoricas": categoricas}
+    def classify_variables(self):
+        num = self.df.select_dtypes(include=[np.number]).columns.tolist()
+        cat = self.df.select_dtypes(exclude=[np.number]).columns.tolist()
+        return num, cat
 
-    def estadisticas_descriptivas(self) -> pd.DataFrame:
-        return self.df.describe()
+    def descriptive_stats(self, cols=None):
+        df = self.df[cols] if cols else self.df
+        return df.describe(include="all").T
 
-    def valores_faltantes(self) -> pd.Series:
-        return self.df.isnull().sum()
+    def missing_summary(self):
+        total = self.df.isnull().sum()
+        percent = (total / len(self.df) * 100).round(2)
+        return pd.DataFrame({"Nulos": total, "Porcentaje (%)": percent}) \
+            .sort_values("Nulos", ascending=False)
 
-    def conteo_categorica(self, col: str) -> pd.Series:
-        return self.df[col].value_counts()
+    def fig_distribution(self, col, bins=30):
+        fig, ax = plt.subplots(figsize=(6, 3.5))
+        ax.hist(self.df[col].dropna(), bins=bins, edgecolor="white")
+        ax.set_xlabel(col)
+        ax.set_ylabel("Frecuencia")
+        ax.set_title(f"Distribución de {col}")
+        ax.grid(axis="y", alpha=0.3)
+        fig.tight_layout()
+        return fig
 
-    def media(self, col: str) -> float:
-        return self.df[col].mean()
+    def fig_boxplot(self, num_col, cat_col):
+        order = self.df.groupby(cat_col)[num_col].median() \
+            .sort_values(ascending=False).index
+        data_plot = [self.df.loc[self.df[cat_col] == v, num_col].dropna()
+                     for v in order]
+        fig, ax = plt.subplots(figsize=(7, 4))
+        ax.boxplot(data_plot, labels=order)
+        ax.set_xlabel(cat_col)
+        ax.set_ylabel(num_col)
+        ax.set_title(f"{num_col} por {cat_col}")
+        plt.xticks(rotation=30, ha="right")
+        ax.grid(axis="y", alpha=0.3)
+        fig.tight_layout()
+        return fig
 
-    def mediana(self, col: str) -> float:
-        return self.df[col].median()
+    def fig_barplot(self, col, top_n=10, horizontal=False):
+        vc = self.df[col].value_counts().head(top_n)
+        fig, ax = plt.subplots(figsize=(7, 4))
+        if horizontal:
+            ax.barh(vc.index[::-1], vc.values[::-1])
+            ax.set_xlabel("Frecuencia")
+        else:
+            ax.bar(vc.index, vc.values)
+            ax.set_ylabel("Frecuencia")
+            plt.xticks(rotation=35, ha="right")
+        ax.set_title(f"Distribución de {col}")
+        ax.grid(axis="x" if horizontal else "y", alpha=0.3)
+        fig.tight_layout()
+        return fig
 
-    def moda(self, col: str):
-        return self.df[col].mode()[0]
+    def fig_crosstab_pct(self, col1, col2):
+        ct = pd.crosstab(self.df[col1], self.df[col2], normalize="index") * 100
+        fig, ax = plt.subplots(figsize=(7, 4))
+        ct.plot(kind="bar", ax=ax)
+        ax.set_xlabel(col1)
+        ax.set_ylabel("Porcentaje (%)")
+        ax.set_title(f"{col1} vs {col2} (% por fila)")
+        ax.legend(title=col2)
+        plt.xticks(rotation=35, ha="right")
+        ax.grid(axis="y", alpha=0.3)
+        fig.tight_layout()
+        return fig
 
-    def distribucion(self, col: str) -> pd.Series:
-        return self.df[col].value_counts(normalize=True) * 100
-
-    def comparacion_grupos(self, num_col: str, cat_col: str) -> pd.DataFrame:
-        return self.df.groupby(cat_col)[num_col].describe()
-
-
-st.set_page_config(
-    page_title="Bank Marketing EDA",
-    page_icon="🏦",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-
-st.markdown("""
-<style>
-    [data-testid="stSidebar"] {background-color: #0d1b2a;}
-    [data-testid="stSidebar"] * {color: #e0e6ef !important;}
-    .main-title {font-size:2.2rem; font-weight:800; color:#1a73e8; margin-bottom:0;}
-    .sub-title  {font-size:1rem;   color:#6c757d; margin-top:0;}
-    .metric-card {
-        background: #f0f4ff;
-        border-left: 4px solid #1a73e8;
-        padding: 0.8rem 1rem;
-        border-radius: 6px;
-        margin-bottom: 0.5rem;
-    }
-    .insight-box {
-        background: #fff8e1;
-        border-left: 4px solid #f9a825;
-        padding: 0.8rem 1rem;
-        border-radius: 6px;
-        margin: 0.5rem 0;
-    }
-    .conclusion-box {
-        background: #e8f5e9;
-        border-left: 4px solid #2e7d32;
-        padding: 0.8rem 1rem;
-        border-radius: 6px;
-        margin: 0.5rem 0;
-    }
-</style>
-""", unsafe_allow_html=True)
-
+    def fig_correlation(self, cols=None):
+        num_cols = cols or self.classify_variables()[0]
+        corr = self.df[num_cols].corr()
+        fig, ax = plt.subplots(figsize=(7, 5))
+        mask = np.triu(np.ones_like(corr, dtype=bool))
+        sns.heatmap(corr, mask=mask, annot=True, fmt=".2f", ax=ax)
+        ax.set_title("Matriz de correlación (numéricas)")
+        fig.tight_layout()
+        return fig
 
 
+# ─────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────
+@st.cache_data
+def load_data(file) -> pd.DataFrame:
+    return pd.read_csv(file, sep=";")
+
+
+def render_fig(fig):
+    st.pyplot(fig)
+    plt.close(fig)
+
+
+def get_df():
+    df = st.session_state.get("df", None)
+    if df is None:
+        st.warning("⚠️ Primero carga el dataset en la sección 'Carga de Datos'.")
+        st.stop()
+    return df
+
+
+# ─────────────────────────────────────────────
+# SIDEBAR
+# ─────────────────────────────────────────────
 with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/bank.png", width=70)
-    st.markdown("## 🏦 Bank Marketing EDA")
-    st.markdown("---")
-    modulo = st.selectbox(
-        "📂 Navegar a:",
-        ["🏠 Home", "📂 Carga del Dataset", "🔍 Análisis EDA", "✅ Conclusiones"],
+    st.title("BankMarketing EDA")
+    menu = st.radio(
+        "Navegar",
+        ["Home",
+         "Carga de Datos",
+         "EDA - Información",
+         "EDA - Distribuciones",
+         "EDA - Bivariado",
+         "EDA - Análisis Dinámico",
+         "Conclusiones"],
     )
     st.markdown("---")
-    st.markdown("**Tecnologías utilizadas:**")
-    st.markdown("🐍 Python · 🐼 Pandas · 📊 Seaborn")
-    st.markdown("📈 Matplotlib · 🚀 Streamlit · 🔢 NumPy")
+    st.write("Dataset: BankMarketing.csv")
 
 
-
-if "df" not in st.session_state:
-    st.session_state.df = None
-
-
-
-
-# ════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────
 # MÓDULO 1 – HOME
-# ════════════════════════════════════════════════════════════
-if modulo == "🏠 Home":
-    st.markdown('<p class="main-title">🏦 Análisis Exploratorio de Datos</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-title">Dataset: Bank Marketing Campaign · Institución Financiera</p>', unsafe_allow_html=True)
-    st.markdown("---")
+# ─────────────────────────────────────────────
+if menu == "Home":
+    st.title("Bank Marketing EDA")
+    st.subheader("Análisis Exploratorio de Datos — Campaña Bancaria")
 
-    col1, col2 = st.columns([2, 1])
+    st.markdown("### Objetivo del análisis")
+    st.write("""
+    Una institución financiera registró una caída en la efectividad de sus
+    campañas de marketing: de 12% a 8% en los últimos 6 meses.
+    Este proyecto aplica un EDA sobre los datos de la última campaña para
+    identificar patrones, relaciones entre variables y perfiles de clientes
+    con mayor propensión a aceptar el producto ofrecido.
 
-    with col1:
-        st.markdown("### 🎯 Objetivo del Análisis")
-        st.markdown("""
-        Este proyecto realiza un **Análisis Exploratorio de Datos (EDA)** sobre el dataset
-        **BankMarketing.csv**, correspondiente a una institución financiera que busca entender
-        los factores que influyen en la aceptación de sus campañas de marketing.
+    El análisis no construye modelos predictivos; el foco está en comprender
+    los datos y extraer insights accionables que orienten decisiones comerciales.
+    """)
 
-        Durante los últimos 6 meses, la efectividad cayó del **12 % al 8 %**, afectando
-        los bonos de los ejecutivos comerciales. La tarea consiste en analizar los datos
-        de la última campaña para **descubrir relaciones y comportamientos relevantes**
-        entre las variables.
-        """)
+    st.markdown("### Sobre el dataset")
+    st.write("""
+    BankMarketing.csv contiene 41,188 registros de clientes contactados en
+    una campaña de depósitos a plazo fijo. Incluye variables demográficas
+    (edad, empleo, educación), financieras (créditos, mora) y de la campaña
+    (canal, duración, intentos). La variable objetivo `y` indica si el cliente
+    suscribió el depósito.
+    """)
 
-        st.markdown("### 👤 Datos del Autor")
-        st.markdown("""
-        | Campo | Detalle |
-        |---|---|
-        | **Nombre completo** | Estudiante Analítica |
-        | **Curso / Especialización** | Especialización en Python for Analytics |
-        | **Año** | 2026 |
-        """)
+    st.markdown("### Autor")
+    st.write("""
+    - **Nombre:** [Tu nombre completo]
+    - **Curso:** Especialización Python for Analytics
+    - **Institución:** DMC Institute
+    - **Año:** 2025
+    """)
 
-    with col2:
-        st.markdown("### 📋 Sobre el Dataset")
-        st.markdown("""
-        <div class="metric-card">
-        <b>Fuente:</b> Institución Financiera<br>
-        <b>Registros:</b> ~4 500 clientes<br>
-        <b>Variables:</b> 21 columnas<br>
-        <b>Variable objetivo:</b> <code>y</code> (aceptó la campaña)
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("### 🛠️ Tecnologías")
-        techs = ["Python 3.x", "Pandas", "NumPy", "Matplotlib", "Seaborn", "Streamlit"]
-        for t in techs:
-            st.markdown(f"✅ {t}")
-
-    st.markdown("---")
-    st.info("👈 Usa el menú lateral para navegar entre módulos. Comienza cargando el dataset.")
+    st.markdown("### Tecnologías utilizadas")
+    st.write("Python, Pandas, NumPy, Matplotlib, Seaborn, Streamlit, Programación Orientada a Objetos")
 
 
+# ─────────────────────────────────────────────
+# MÓDULO 2 – CARGA
+# ─────────────────────────────────────────────
+elif menu == "Carga de Datos":
+    st.title("Carga del Dataset")
 
-# ════════════════════════════════════════════════════════════
-# MÓDULO 2 – CARGA DEL DATASET
-# ════════════════════════════════════════════════════════════
-elif modulo == "📂 Carga del Dataset":
-    st.markdown("## 📂 Carga del Dataset")
-    st.markdown("Sube el archivo **BankMarketing.csv** para comenzar el análisis.")
+    uploaded = st.file_uploader(
+        "Sube el archivo BankMarketing.csv (separador: punto y coma)",
+        type=["csv"],
+    )
 
-    archivo = st.file_uploader("📁 Selecciona el archivo CSV", type=["csv"])
-
-    if archivo is not None:
-        try:
-            df = pd.read_csv(archivo, sep=";")
-            st.session_state.df = df
-            st.success(f"✅ Archivo cargado correctamente: **{archivo.name}**")
-
-            col1, col2, col3 = st.columns(3)
-            col1.metric("📋 Filas", df.shape[0])
-            col2.metric("📊 Columnas", df.shape[1])
-            col3.metric("🔢 Variables numéricas", df.select_dtypes(include=np.number).shape[1])
-
-            st.markdown("### 👁️ Vista previa del dataset (primeras 5 filas)")
-            st.dataframe(df.head(), use_container_width=True)
-
-            st.markdown("### 📐 Dimensiones del dataset")
-            st.markdown(f"El dataset contiene **{df.shape[0]} registros** y **{df.shape[1]} variables**.")
-        except Exception as e:
-            st.error(f"❌ Error al cargar el archivo: {e}")
-    else:
-        st.warning("⚠️ Ningún archivo cargado. Por favor, sube el CSV para continuar.")
-
-# ════════════════════════════════════════════════════════════
-# MÓDULO 3 – EDA
-# ════════════════════════════════════════════════════════════
-elif modulo == "🔍 Análisis EDA":
-    if st.session_state.df is None:
-        st.warning("⚠️ Primero debes cargar el dataset en el módulo **📂 Carga del Dataset**.")
+    if uploaded is None:
+        st.info("Por favor, carga el archivo CSV para continuar.")
         st.stop()
 
-    df = st.session_state.df
+    df = load_data(uploaded)
+    st.session_state["df"] = df
+
+    st.success(f"Archivo cargado correctamente: {uploaded.name}")
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Filas", f"{df.shape[0]:,}")
+    col2.metric("Columnas", f"{df.shape[1]}")
+    col3.metric("Tamaño estimado",
+                f"{df.memory_usage(deep=True).sum() / 1024**2:.1f} MB")
+
+    st.markdown("### Vista previa (primeras 5 filas)")
+    st.dataframe(df.head(), use_container_width=True)
+
+    st.markdown("### Tipos de datos")
+    dtype_df = pd.DataFrame({"Tipo": df.dtypes.astype(str),
+                              "Nulos": df.isnull().sum()})
+    st.dataframe(dtype_df, use_container_width=True)
+
+
+# ─────────────────────────────────────────────
+# MÓDULO 3 – EDA INFORMACIÓN
+# ─────────────────────────────────────────────
+elif menu == "EDA - Información":
+    df = get_df()
     analyzer = DataAnalyzer(df)
-    clases = analyzer.clasificar_variables()
+    st.title("EDA — Información General")
 
-    st.markdown("## 🔍 Análisis Exploratorio de Datos (EDA)")
-    st.caption("Explora cada ítem usando las pestañas a continuación.")
+    tabs = st.tabs(["Ítem 1: Dataset Info", "Ítem 2: Variables",
+                    "Ítem 3: Estadísticas", "Ítem 4: Valores Faltantes"])
 
-    tabs = st.tabs([
-        "📌 Info General",
-        "🏷️ Clasificación",
-        "📊 Estadísticas",
-        "❓ Valores Nulos",
-        "📈 Dist. Numéricas",
-        "📉 Categóricas",
-        "🔗 Bivariado Num",
-        "🔗 Bivariado Cat",
-        "🎛️ Análisis Dinámico",
-        "💡 Hallazgos",
-    ])
-
-    # ── Ítem 1: Información general ──────────────────────────
+    # ÍTEM 1
     with tabs[0]:
-        st.markdown("### 📌 Ítem 1 — Información general del dataset")
-        st.markdown("Resumen técnico del DataFrame: tipos de datos, memoria y valores nulos.")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("#### Tipos de datos por columna")
-            tipos_df = pd.DataFrame({"Tipo": df.dtypes, "No nulos": df.notnull().sum()})
-            st.dataframe(tipos_df, use_container_width=True)
-        with col2:
-            st.markdown("#### Conteo de valores nulos")
-            nulos = analyzer.valores_faltantes()
-            fig, ax = plt.subplots(figsize=(5, 4))
-            nulos.plot(kind="bar", color="#1a73e8", ax=ax)
-            ax.set_title("Valores nulos por columna")
-            ax.set_ylabel("Cantidad")
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
-
-        buf = StringIO()
-        df.info(buf=buf)
-        st.markdown("#### .info() del dataset")
-        st.code(buf.getvalue())
-
-    # ── Ítem 2: Clasificación de variables ───────────────────
-    with tabs[1]:
-        st.markdown("### 🏷️ Ítem 2 — Clasificación de variables")
-        st.markdown("Se usa una **función personalizada** dentro de la clase `DataAnalyzer` para clasificar las variables.")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("#### 🔢 Variables Numéricas")
-            num_df = pd.DataFrame({"Variable": clases["numericas"], "Tipo": "Numérica"})
-            st.dataframe(num_df, use_container_width=True)
-            st.metric("Total numéricas", len(clases["numericas"]))
-        with col2:
-            st.markdown("#### 🔤 Variables Categóricas")
-            cat_df = pd.DataFrame({"Variable": clases["categoricas"], "Tipo": "Categórica"})
-            st.dataframe(cat_df, use_container_width=True)
-            st.metric("Total categóricas", len(clases["categoricas"]))
-
-        fig, ax = plt.subplots(figsize=(4, 3))
-        ax.pie(
-            [len(clases["numericas"]), len(clases["categoricas"])],
-            labels=["Numéricas", "Categóricas"],
-            autopct="%1.0f%%",
-            colors=["#1a73e8", "#f9a825"],
-            startangle=90,
-        )
-        ax.set_title("Proporción de tipos de variables")
-        st.pyplot(fig)
-        plt.close()
-
-    # ── Ítem 3: Estadísticas descriptivas ────────────────────
-    with tabs[2]:
-        st.markdown("### 📊 Ítem 3 — Estadísticas descriptivas")
-        st.markdown("Se emplea `.describe()` para obtener medidas de tendencia central y dispersión.")
-
-        st.dataframe(analyzer.estadisticas_descriptivas().T, use_container_width=True)
-
-        st.markdown("#### Interpretación básica")
+        st.header("Ítem 1 — Información general del dataset")
         col1, col2, col3 = st.columns(3)
-        col1.markdown('<div class="metric-card">📌 <b>age</b><br>Media: {:.1f} | Mediana: {:.0f}</div>'.format(
-            analyzer.media("age"), analyzer.mediana("age")), unsafe_allow_html=True)
-        col2.markdown('<div class="metric-card">⏱️ <b>duration</b><br>Media: {:.0f}s | Mediana: {:.0f}s</div>'.format(
-            analyzer.media("duration"), analyzer.mediana("duration")), unsafe_allow_html=True)
-        col3.markdown('<div class="metric-card">📞 <b>campaign</b><br>Media: {:.1f} | Moda: {}</div>'.format(
-            analyzer.media("campaign"), analyzer.moda("campaign")), unsafe_allow_html=True)
+        col1.metric("Filas", f"{df.shape[0]:,}")
+        col2.metric("Columnas", f"{df.shape[1]}")
+        col3.metric("Valores nulos totales", int(df.isnull().sum().sum()))
 
-    # ── Ítem 4: Valores faltantes ─────────────────────────────
+        st.markdown("#### Tipos de datos por columna")
+        buf = io.StringIO()
+        df.info(buf=buf)
+        st.code(buf.getvalue(), language="text")
+
+        st.write("""
+        **Discusión:** el dataset no presenta valores nulos. Todas las 21
+        variables están completamente pobladas, lo que facilita el análisis
+        sin necesidad de imputación previa.
+        """)
+
+    # ÍTEM 2
+    with tabs[1]:
+        st.header("Ítem 2 — Clasificación de variables")
+        num_cols, cat_cols = analyzer.classify_variables()
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**Variables numéricas ({len(num_cols)}):**")
+            st.write(num_cols)
+        with col2:
+            st.write(f"**Variables categóricas ({len(cat_cols)}):**")
+            st.write(cat_cols)
+
+        resumen = pd.DataFrame({
+            "Variable": df.columns,
+            "Tipo pandas": df.dtypes.astype(str).values,
+            "Categoría": ["Numérica" if c in num_cols else "Categórica"
+                          for c in df.columns],
+            "Únicos": [df[c].nunique() for c in df.columns],
+        })
+        st.dataframe(resumen, use_container_width=True, hide_index=True)
+
+    # ÍTEM 3
+    with tabs[2]:
+        st.header("Ítem 3 — Estadísticas descriptivas")
+        num_cols, _ = analyzer.classify_variables()
+        show_cols = st.multiselect(
+            "Selecciona variables numéricas a describir",
+            options=num_cols, default=num_cols[:6],
+        )
+        if show_cols:
+            stats = df[show_cols].describe().T.round(2)
+            stats["mediana"] = df[show_cols].median().round(2)
+            stats["moda"] = df[show_cols].mode().iloc[0].round(2)
+            st.dataframe(stats, use_container_width=True)
+
+            st.write(f"""
+            **Interpretación:** la variable `duration` tiene media de
+            {df['duration'].mean():.0f}s pero mediana de
+            {df['duration'].median():.0f}s, lo cual indica sesgo a la derecha
+            por llamadas muy largas. `age` se concentra alrededor de los 40 años.
+            """)
+
+    # ÍTEM 4
     with tabs[3]:
-        st.markdown("### ❓ Ítem 4 — Análisis de valores faltantes")
-        nulos = analyzer.valores_faltantes()
-        total_nulos = nulos.sum()
+        st.header("Ítem 4 — Análisis de valores faltantes")
+        miss = analyzer.missing_summary()
+        st.dataframe(miss, use_container_width=True)
 
-        if total_nulos == 0:
-            st.success("✅ El dataset no presenta valores nulos directos.")
-            st.markdown("""
-            <div class="insight-box">
-            ⚠️ <b>Discusión:</b> Aunque no existen <code>NaN</code>, la variable <code>pdays</code> usa
-            el valor <b>999</b> como indicador de "cliente no contactado previamente". Esto debe considerarse
-            en análisis posteriores para evitar distorsiones estadísticas.
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.warning(f"⚠️ Se encontraron {total_nulos} valores nulos.")
-            fig, ax = plt.subplots(figsize=(8, 3))
-            nulos[nulos > 0].plot(kind="bar", color="#e53935", ax=ax)
-            ax.set_title("Columnas con valores nulos")
-            st.pyplot(fig)
-            plt.close()
+        total_miss = miss["Nulos"].sum()
+        if total_miss == 0:
+            st.success("El dataset no presenta valores nulos explícitos (NaN).")
+            st.write("""
+            **Discusión:** la ausencia de nulos puede indicar que el dataset ya
+            fue preprocesado, o que los valores desconocidos se codificaron
+            como categorías explícitas (ej. "unknown").
+            """)
 
-        st.markdown("#### Conteo completo de nulos por variable")
-        st.dataframe(nulos.reset_index().rename(columns={"index": "Variable", 0: "Nulos"}), use_container_width=True)
+            _, cat_cols = analyzer.classify_variables()
+            unk = {c: (df[c] == "unknown").sum()
+                   for c in cat_cols if "unknown" in df[c].values}
+            if unk:
+                st.markdown("#### Valores 'unknown' por variable categórica")
+                unk_df = pd.DataFrame.from_dict(
+                    unk, orient="index", columns=["Conteo 'unknown'"])
+                unk_df["% del total"] = (unk_df["Conteo 'unknown'"] / len(df) * 100).round(2)
+                st.dataframe(unk_df, use_container_width=True)
 
-    # ── Ítem 5: Distribución de variables numéricas ───────────
-    with tabs[4]:
-        st.markdown("### 📈 Ítem 5 — Distribución de variables numéricas")
-        st.markdown("Histogramas para visualizar la distribución de cada variable numérica.")
 
-        num_cols = clases["numericas"]
-        col_sel = st.selectbox("Selecciona variable numérica:", num_cols)
+# ─────────────────────────────────────────────
+# MÓDULO 4 – DISTRIBUCIONES
+# ─────────────────────────────────────────────
+elif menu == "EDA - Distribuciones":
+    df = get_df()
+    analyzer = DataAnalyzer(df)
+    st.title("EDA — Distribuciones")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            fig, ax = plt.subplots(figsize=(5, 3.5))
-            sns.histplot(df[col_sel], bins=30, kde=True, color="#1a73e8", ax=ax)
-            ax.set_title(f"Distribución de {col_sel}")
-            ax.set_xlabel(col_sel)
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
-        with col2:
-            fig, ax = plt.subplots(figsize=(5, 3.5))
-            sns.boxplot(y=df[col_sel], color="#90caf9", ax=ax)
-            ax.set_title(f"Boxplot de {col_sel}")
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
+    tabs = st.tabs(["Ítem 5: Numéricas", "Ítem 6: Categóricas"])
 
-        st.markdown("#### Todos los histogramas")
-        mostrar_todos = st.checkbox("Ver todos los histogramas")
-        if mostrar_todos:
-            n = len(num_cols)
-            cols_grid = 3
-            rows_grid = (n + cols_grid - 1) // cols_grid
-            fig, axes = plt.subplots(rows_grid, cols_grid, figsize=(14, rows_grid * 3))
-            axes = axes.flatten()
-            for i, col in enumerate(num_cols):
-                sns.histplot(df[col], bins=25, kde=True, ax=axes[i], color="#1a73e8")
-                axes[i].set_title(col, fontsize=9)
-            for j in range(i + 1, len(axes)):
-                axes[j].set_visible(False)
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
+    # ÍTEM 5
+    with tabs[0]:
+        st.header("Ítem 5 — Distribución de variables numéricas")
+        num_cols, _ = analyzer.classify_variables()
 
-    # ── Ítem 6: Variables categóricas ────────────────────────
-    with tabs[5]:
-        st.markdown("### 📉 Ítem 6 — Análisis de variables categóricas")
-        cat_cols = clases["categoricas"]
-        cat_sel = st.selectbox("Selecciona variable categórica:", cat_cols)
+        sel_num = st.selectbox("Variable numérica", num_cols, index=0)
+        bins = st.slider("Número de bins", 10, 80, 30)
 
-        conteo = analyzer.conteo_categorica(cat_sel)
-        prop = analyzer.distribucion(cat_sel)
+        render_fig(analyzer.fig_distribution(sel_num, bins=bins))
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**Conteo — `{cat_sel}`**")
-            st.dataframe(
-                pd.DataFrame({"Categoría": conteo.index, "Conteo": conteo.values, "% ": prop.values.round(1)}),
-                use_container_width=True,
-            )
-        with col2:
-            fig, ax = plt.subplots(figsize=(5, 3.5))
-            sns.barplot(x=conteo.values, y=conteo.index, palette="Blues_r", ax=ax)
-            ax.set_title(f"Distribución de {cat_sel}")
-            ax.set_xlabel("Frecuencia")
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
+        data = df[sel_num].dropna()
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Media", f"{data.mean():.2f}")
+        col2.metric("Mediana", f"{data.median():.2f}")
+        col3.metric("Desv. Std", f"{data.std():.2f}")
+        col4.metric("Sesgo", f"{data.skew():.2f}")
 
-    # ── Ítem 7: Bivariado numérico vs categórico ─────────────
-    with tabs[6]:
-        st.markdown("### 🔗 Ítem 7 — Análisis bivariado (numérico vs categórico)")
-        st.markdown("Comparación de una variable numérica respecto a la variable objetivo **`y`** u otras categóricas.")
+        st.markdown("#### Panel completo de variables numéricas")
+        fig2, axes = plt.subplots(2, 5, figsize=(14, 5))
+        for ax, col in zip(axes.flat, num_cols):
+            ax.hist(df[col].dropna(), bins=25, edgecolor="white")
+            ax.set_title(col, fontsize=8)
+            ax.grid(axis="y", alpha=0.25)
+            ax.tick_params(labelsize=7)
+        fig2.tight_layout()
+        render_fig(fig2)
 
-        num_sel7 = st.selectbox("Variable numérica:", clases["numericas"], key="biv_num")
-        cat_sel7 = st.selectbox("Variable categórica:", clases["categoricas"], key="biv_cat")
+        st.write("""
+        **Interpretación visual:** `duration` y `campaign` presentan fuerte
+        sesgo positivo: la mayoría de los contactos son breves y pocos. Las
+        variables macroeconómicas (`euribor3m`, `emp.var.rate`) muestran
+        distribuciones bimodales asociadas a ciclos económicos.
+        """)
+
+    # ÍTEM 6
+    with tabs[1]:
+        st.header("Ítem 6 — Análisis de variables categóricas")
+        _, cat_cols = analyzer.classify_variables()
+
+        sel_cat = st.selectbox("Variable categórica", cat_cols,
+                               index=cat_cols.index("job") if "job" in cat_cols else 0)
+        top_n = st.slider("Top N categorías", 5, 20, 10)
 
         col1, col2 = st.columns(2)
         with col1:
-            fig, ax = plt.subplots(figsize=(5, 4))
-            sns.boxplot(data=df, x=cat_sel7, y=num_sel7, palette="Set2", ax=ax)
-            ax.set_title(f"{num_sel7} por {cat_sel7}")
-            plt.xticks(rotation=30, ha="right")
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
+            render_fig(analyzer.fig_barplot(sel_cat, top_n=top_n, horizontal=True))
         with col2:
-            fig, ax = plt.subplots(figsize=(5, 4))
-            sns.violinplot(data=df, x=cat_sel7, y=num_sel7, palette="Set3", ax=ax)
-            ax.set_title(f"Violinplot: {num_sel7} vs {cat_sel7}")
-            plt.xticks(rotation=30, ha="right")
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
+            vc = df[sel_cat].value_counts().head(top_n)
+            pct = (vc / len(df) * 100).round(2)
+            st.dataframe(pd.DataFrame({"Frecuencia": vc, "%": pct}),
+                         use_container_width=True)
 
-        st.markdown("#### Estadísticas por grupo")
-        st.dataframe(analyzer.comparacion_grupos(num_sel7, cat_sel7), use_container_width=True)
+        st.markdown("#### Variable objetivo `y` (tasa de conversión)")
+        y_vc = df["y"].value_counts()
+        fig_p, ax_p = plt.subplots(figsize=(4, 4))
+        ax_p.pie(y_vc.values,
+                 labels=[f"{l} ({v:,}, {v/len(df)*100:.1f}%)"
+                         for l, v in zip(y_vc.index, y_vc.values)],
+                 startangle=90)
+        ax_p.set_title("Distribución de y")
+        render_fig(fig_p)
 
-    # ── Ítem 8: Bivariado categórico vs categórico ───────────
-    with tabs[7]:
-        st.markdown("### 🔗 Ítem 8 — Análisis bivariado (categórico vs categórico)")
+        st.write(f"""
+        **Discusión:** solo el {y_vc['yes']/len(df)*100:.1f}% de los clientes
+        aceptó la campaña, lo que confirma el desbalanceo de clases. El análisis
+        debe enfocarse en caracterizar ese segmento minoritario.
+        """)
 
-        cat_sel8a = st.selectbox("Variable 1:", clases["categoricas"], key="biv_cat8a")
-        cat_sel8b = st.selectbox("Variable 2 (referencia):", clases["categoricas"],
-                                 index=clases["categoricas"].index("y") if "y" in clases["categoricas"] else 0,
-                                 key="biv_cat8b")
 
-        tabla = pd.crosstab(df[cat_sel8a], df[cat_sel8b], normalize="index") * 100
+# ─────────────────────────────────────────────
+# MÓDULO 5 – BIVARIADO
+# ─────────────────────────────────────────────
+elif menu == "EDA - Bivariado":
+    df = get_df()
+    analyzer = DataAnalyzer(df)
+    st.title("EDA — Análisis Bivariado")
+
+    tabs = st.tabs(["Ítem 7: Numérico vs y",
+                    "Ítem 8: Categórico vs y",
+                    "Extra: Correlaciones"])
+
+    # ÍTEM 7
+    with tabs[0]:
+        st.header("Ítem 7 — Numérico vs Categórico (y)")
+        num_cols, _ = analyzer.classify_variables()
+        sel = st.selectbox("Variable numérica", num_cols,
+                           index=num_cols.index("duration") if "duration" in num_cols else 0)
 
         col1, col2 = st.columns(2)
         with col1:
-            fig, ax = plt.subplots(figsize=(6, 4))
-            tabla.plot(kind="bar", stacked=True, colormap="tab10", ax=ax)
-            ax.set_title(f"{cat_sel8a} vs {cat_sel8b} (%)")
-            ax.set_ylabel("Porcentaje")
-            plt.xticks(rotation=30, ha="right")
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
+            render_fig(analyzer.fig_boxplot(sel, "y"))
         with col2:
-            fig, ax = plt.subplots(figsize=(6, 4))
-            sns.heatmap(tabla.round(1), annot=True, fmt=".1f", cmap="YlOrRd", ax=ax)
-            ax.set_title(f"Heatmap: {cat_sel8a} vs {cat_sel8b}")
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
+            grp = df.groupby("y")[sel].agg(["mean", "median", "std"]).round(2)
+            grp.columns = ["Media", "Mediana", "Desv. Std"]
+            st.dataframe(grp, use_container_width=True)
+            diff_mean = grp.loc["yes", "Media"] - grp.loc["no", "Media"]
+            st.metric(f"Diferencia de medias (yes - no) en {sel}", f"{diff_mean:+.2f}")
 
-    # ── Ítem 9: Análisis dinámico ─────────────────────────────
-    with tabs[8]:
-        st.markdown("### 🎛️ Ítem 9 — Análisis basado en parámetros seleccionados")
-        st.markdown("Selecciona variables para un análisis dinámico personalizado.")
+        st.markdown("#### Distribución de edad por resultado (y)")
+        fig_age, ax_age = plt.subplots(figsize=(7, 3.5))
+        for val in ["yes", "no"]:
+            ax_age.hist(df.loc[df["y"] == val, "age"], bins=30,
+                        alpha=0.6, label=val, density=True)
+        ax_age.set_xlabel("Edad")
+        ax_age.set_ylabel("Densidad")
+        ax_age.set_title("Edad según resultado de campaña")
+        ax_age.legend()
+        ax_age.grid(axis="y", alpha=0.3)
+        fig_age.tight_layout()
+        render_fig(fig_age)
 
-        tipo_analisis = st.selectbox("Tipo de análisis:", ["Correlación entre numéricas", "Distribución filtrada por categoría"])
+        st.write("""
+        **Interpretación:** los clientes que aceptaron (`yes`) tienden a tener
+        mayor duración de llamada. Clientes en los extremos de edad (jóvenes
+        menores de 25 y mayores de 60) muestran mayor tasa de conversión.
+        """)
 
-        if tipo_analisis == "Correlación entre numéricas":
-            vars_sel = st.multiselect("Selecciona variables numéricas (mín. 2):", clases["numericas"],
-                                      default=clases["numericas"][:5])
-            if len(vars_sel) >= 2:
-                fig, ax = plt.subplots(figsize=(8, 5))
-                corr = df[vars_sel].corr()
-                sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", center=0, ax=ax)
-                ax.set_title("Mapa de correlación")
-                plt.tight_layout()
-                st.pyplot(fig)
-                plt.close()
+    # ÍTEM 8
+    with tabs[1]:
+        st.header("Ítem 8 — Categórico vs Categórico (y)")
+        _, cat_cols = analyzer.classify_variables()
+        cat_no_y = [c for c in cat_cols if c != "y"]
+        sel_cat = st.selectbox("Variable categórica", cat_no_y,
+                               index=cat_no_y.index("education") if "education" in cat_no_y else 0)
+
+        col1, col2 = st.columns([3, 2])
+        with col1:
+            render_fig(analyzer.fig_crosstab_pct(sel_cat, "y"))
+        with col2:
+            ct_abs = pd.crosstab(df[sel_cat], df["y"])
+            ct_pct = (ct_abs.div(ct_abs.sum(axis=1), axis=0) * 100).round(2)
+            ct_pct.columns = ["no (%)", "yes (%)"]
+            st.dataframe(ct_pct.sort_values("yes (%)", ascending=False),
+                         use_container_width=True)
+
+        st.write(f"""
+        **Discusión:** en `{sel_cat}` se observan diferencias claras en la tasa
+        de conversión entre categorías. Segmentar la campaña por este atributo
+        podría mejorar la efectividad.
+        """)
+
+    # EXTRA: CORRELACIONES
+    with tabs[2]:
+        st.header("Matriz de correlación")
+        num_cols, _ = analyzer.classify_variables()
+        sel_corr = st.multiselect("Columnas a correlacionar", num_cols, default=num_cols)
+        if len(sel_corr) >= 2:
+            render_fig(analyzer.fig_correlation(sel_corr))
+            st.write("""
+            **Interpretación:** `euribor3m`, `emp.var.rate` y `nr.employed`
+            tienen alta correlación entre sí (contexto macroeconómico). Usar
+            solo una de ellas en modelos evitaría problemas de multicolinealidad.
+            """)
+
+
+# ─────────────────────────────────────────────
+# MÓDULO 6 – ANÁLISIS DINÁMICO
+# ─────────────────────────────────────────────
+elif menu == "EDA - Análisis Dinámico":
+    df = get_df()
+    analyzer = DataAnalyzer(df)
+    st.title("EDA — Análisis Dinámico (Ítem 9)")
+
+    st.write("Configura el análisis seleccionando las variables de interés.")
+
+    num_cols, cat_cols = analyzer.classify_variables()
+    cat_no_y = [c for c in cat_cols if c != "y"]
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        eje_x = st.selectbox("Variable X (categórica o numérica)", cat_no_y + num_cols, index=0)
+    with col2:
+        eje_y = st.selectbox("Variable Y (numérica o resultado)", num_cols + ["y"], index=0)
+    with col3:
+        filtro_y = st.multiselect("Filtrar por resultado (y)", ["yes", "no"], default=["yes", "no"])
+
+    min_age, max_age = int(df["age"].min()), int(df["age"].max())
+    age_range = st.slider("Rango de edad", min_age, max_age, (min_age, max_age))
+    mostrar_tabla = st.checkbox("Mostrar tabla de datos agrupados", value=False)
+
+    df_f = df[(df["y"].isin(filtro_y)) &
+              (df["age"] >= age_range[0]) &
+              (df["age"] <= age_range[1])]
+
+    st.write(f"Registros filtrados: **{len(df_f):,}** de {len(df):,}")
+
+    if df_f.empty:
+        st.warning("Sin datos para los filtros seleccionados.")
+    else:
+        if eje_x in num_cols and eje_y in num_cols:
+            fig_sc, ax_sc = plt.subplots(figsize=(7, 4))
+            for val in filtro_y:
+                sub = df_f[df_f["y"] == val]
+                ax_sc.scatter(sub[eje_x], sub[eje_y], alpha=0.3, s=10, label=val)
+            ax_sc.set_xlabel(eje_x)
+            ax_sc.set_ylabel(eje_y)
+            ax_sc.set_title(f"{eje_x} vs {eje_y}")
+            ax_sc.legend(title="y")
+            ax_sc.grid(alpha=0.3)
+            fig_sc.tight_layout()
+            render_fig(fig_sc)
+        elif eje_x in cat_no_y:
+            if eje_y == "y":
+                render_fig(analyzer.fig_crosstab_pct(eje_x, "y"))
             else:
-                st.info("Selecciona al menos 2 variables para la correlación.")
+                render_fig(analyzer.fig_boxplot(eje_y, eje_x))
 
-        else:
-            col_num = st.selectbox("Variable numérica:", clases["numericas"], key="din_num")
-            col_cat = st.selectbox("Variable categórica (filtro):", clases["categoricas"], key="din_cat")
-            cats_disp = df[col_cat].unique().tolist()
-            cats_sel = st.multiselect("Categorías a incluir:", cats_disp, default=cats_disp[:3])
+        if mostrar_tabla and eje_x in cat_no_y and eje_y in num_cols:
+            tbl = df_f.groupby(eje_x)[eje_y].agg(["mean", "median", "count"]).round(2)
+            tbl.columns = ["Media", "Mediana", "N"]
+            tbl = tbl.sort_values("Media", ascending=False)
+            st.dataframe(tbl, use_container_width=True)
 
-            rango = st.slider(
-                f"Filtrar rango de {col_num}:",
-                float(df[col_num].min()),
-                float(df[col_num].max()),
-                (float(df[col_num].quantile(0.05)), float(df[col_num].quantile(0.95))),
-            )
-            mostrar_media = st.checkbox("Mostrar línea de media", value=True)
 
-            df_fil = df[(df[col_cat].isin(cats_sel)) & (df[col_num].between(*rango))]
+# ─────────────────────────────────────────────
+# MÓDULO 7 – CONCLUSIONES
+# ─────────────────────────────────────────────
+elif menu == "Conclusiones":
+    df = get_df()
+    st.title("Hallazgos Clave y Conclusiones (Ítem 10)")
 
-            fig, ax = plt.subplots(figsize=(8, 4))
-            for cat in cats_sel:
-                sub = df_fil[df_fil[col_cat] == cat][col_num]
-                sns.kdeplot(sub, ax=ax, label=str(cat), fill=True, alpha=0.3)
-            if mostrar_media:
-                ax.axvline(df_fil[col_num].mean(), color="red", linestyle="--", label=f"Media: {df_fil[col_num].mean():.1f}")
-            ax.set_title(f"Distribución de {col_num} por {col_cat}")
-            ax.legend()
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
-            st.caption(f"Registros filtrados: {len(df_fil):,}")
+    total = len(df)
+    yes_rate = df["y"].value_counts(normalize=True)["yes"] * 100
+    avg_dur_yes = df.loc[df["y"] == "yes", "duration"].mean()
+    avg_dur_no = df.loc[df["y"] == "no", "duration"].mean()
 
-    # ── Ítem 10: Hallazgos clave ──────────────────────────────
-    with tabs[9]:
-        st.markdown("### 💡 Ítem 10 — Hallazgos clave del EDA")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total registros", f"{total:,}")
+    col2.metric("Tasa conversión", f"{yes_rate:.1f}%")
+    col3.metric("Duración media YES", f"{avg_dur_yes:.0f}s")
+    col4.metric("Duración media NO", f"{avg_dur_no:.0f}s")
 
-        col1, col2 = st.columns(2)
+    st.markdown("### Visualización resumen de hallazgos")
 
-        with col1:
-            st.markdown("#### 📊 Resumen visual — Variable objetivo `y`")
-            conteo_y = df["y"].value_counts()
-            fig, axes = plt.subplots(1, 2, figsize=(7, 3.5))
-            axes[0].pie(conteo_y.values, labels=conteo_y.index, autopct="%1.1f%%",
-                        colors=["#e53935", "#43a047"], startangle=90)
-            axes[0].set_title("Aceptación de campaña")
-            top_jobs = df[df["y"] == "yes"]["job"].value_counts().head(6)
-            sns.barplot(x=top_jobs.values, y=top_jobs.index, palette="Greens_r", ax=axes[1])
-            axes[1].set_title("Top empleos que aceptaron")
-            axes[1].set_xlabel("Conteo")
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
+    fig_sum, axes = plt.subplots(1, 3, figsize=(14, 4))
 
-        with col2:
-            st.markdown("#### 🔍 Insights principales")
-            insights = [
-                "📌 Solo ~11% de los clientes aceptó la campaña (desbalanceo de clases).",
-                "📌 La duración del contacto es el predictor más correlacionado con la aceptación.",
-                "📌 Los clientes retirados (retired) y estudiantes tienen mayor tasa de conversión.",
-                "📌 El mes de mayo concentra la mayor cantidad de contactos realizados.",
-                "📌 Clientes sin crédito en mora tienen mayor probabilidad de aceptar.",
-                "📌 El canal celular supera al teléfono fijo en efectividad.",
-            ]
-            for i in insights:
-                st.markdown(f'<div class="insight-box">{i}</div>', unsafe_allow_html=True)
+    job_rate = (df[df["y"] == "yes"].groupby("job").size() /
+                df.groupby("job").size() * 100).sort_values(ascending=False)
+    axes[0].barh(job_rate.index, job_rate.values)
+    axes[0].set_title("Tasa de conversión por empleo (%)", fontsize=9)
+    axes[0].grid(axis="x", alpha=0.3)
+    axes[0].tick_params(labelsize=7)
 
-# ════════════════════════════════════════════════════════════
-# MÓDULO 4 – CONCLUSIONES
-# ════════════════════════════════════════════════════════════
-elif modulo == "✅ Conclusiones":
-    st.markdown("## ✅ Conclusiones finales")
-    st.markdown("Basadas en el análisis exploratorio del dataset BankMarketing.csv")
-    st.markdown("---")
+    month_order = ["jan", "feb", "mar", "apr", "may", "jun",
+                   "jul", "aug", "sep", "oct", "nov", "dec"]
+    mo = df[df["month"].isin(month_order)]
+    month_rate = (mo[mo["y"] == "yes"].groupby("month").size() /
+                  mo.groupby("month").size() * 100).reindex(month_order, fill_value=0)
+    axes[1].bar(month_rate.index, month_rate.values)
+    axes[1].set_title("Tasa de conversión por mes (%)", fontsize=9)
+    axes[1].grid(axis="y", alpha=0.3)
+    axes[1].tick_params(axis="x", rotation=45, labelsize=7)
+
+    pout_rate = (df[df["y"] == "yes"].groupby("poutcome").size() /
+                 df.groupby("poutcome").size() * 100).sort_values(ascending=False)
+    axes[2].bar(pout_rate.index, pout_rate.values)
+    axes[2].set_title("Tasa de conversión por resultado anterior (%)", fontsize=9)
+    axes[2].grid(axis="y", alpha=0.3)
+
+    fig_sum.tight_layout()
+    render_fig(fig_sum)
+
+    st.markdown("### Conclusiones finales")
 
     conclusiones = [
-        {
-            "num": "1",
-            "titulo": "La campaña tiene una tasa de conversión baja (~11%)",
-            "texto": (
-                "El dataset está altamente desbalanceado: aproximadamente el 89% de los clientes respondió 'no' "
-                "a la campaña. Esto indica que la segmentación actual no es eficiente y se requiere un enfoque "
-                "más dirigido para mejorar la tasa de conversión y recuperar el indicador de efectividad."
-            ),
-        },
-        {
-            "num": "2",
-            "titulo": "La duración del contacto es el factor más influyente",
-            "texto": (
-                "Los clientes que eventualmente aceptaron la campaña tuvieron conversaciones significativamente "
-                "más largas (mediana > 500s vs ~100s en rechazos). Aunque la duración no puede controlarse de "
-                "antemano, es un indicador de interés real del cliente."
-            ),
-        },
-        {
-            "num": "3",
-            "titulo": "El perfil demográfico importa: retirados y estudiantes lideran la conversión",
-            "texto": (
-                "Al analizar `job` vs `y`, los segmentos de jubilados y estudiantes muestran las tasas de "
-                "aceptación más altas proporcionalmente, a pesar de no ser los grupos más contactados. "
-                "Redirigir esfuerzos hacia estos segmentos podría mejorar la efectividad."
-            ),
-        },
-        {
-            "num": "4",
-            "titulo": "El canal de comunicación impacta los resultados",
-            "texto": (
-                "Los contactos realizados por celular ('cellular') tienen mayor tasa de conversión que los "
-                "realizados por teléfono fijo ('telephone'). La institución debería priorizar el canal móvil "
-                "en futuras campañas para maximizar la efectividad."
-            ),
-        },
-        {
-            "num": "5",
-            "titulo": "Los indicadores macroeconómicos correlacionan con la aceptación",
-            "texto": (
-                "Variables como `euribor3m`, `emp.var.rate` y `cons.conf.idx` muestran correlaciones "
-                "negativas entre sí. Los periodos de menor tasa euribor coinciden con mayor aceptación, "
-                "sugiriendo que el contexto económico favorable facilita la toma de decisiones financieras."
-            ),
-        },
+        ("1. La duración del contacto es el predictor más relevante.",
+         "Los clientes que aceptaron la campaña tuvieron llamadas significativamente "
+         f"más largas (media {avg_dur_yes:.0f}s vs {avg_dur_no:.0f}s). Aunque la "
+         "duración no se conoce antes de la llamada, indica que mantener "
+         "conversaciones productivas es clave para la conversión."),
+        ("2. Los meses de menor actividad macroeconómica son más efectivos.",
+         "Marzo, septiembre, octubre y diciembre muestran las tasas de conversión "
+         "más altas. Esto coincide con periodos de euribor3m bajo, donde los "
+         "depósitos a plazo resultan más atractivos para el cliente."),
+        ("3. El resultado de la campaña anterior es altamente predictivo.",
+         "Los clientes con poutcome = success convierten a una tasa muy superior "
+         "al resto. Priorizar la recontactación de clientes con historial positivo "
+         "puede mejorar directamente la efectividad de la campaña."),
+        ("4. El perfil de empleo influye significativamente en la conversión.",
+         "Los clientes con empleos de mayor cualificación (admin., management, "
+         "retired) presentan tasas de conversión más altas. Segmentar las "
+         "campañas por tipo de empleo permite asignar recursos comerciales con "
+         "mayor precisión."),
+        ("5. La alta concentración de contactos en mayo reduce la efectividad global.",
+         f"El {(df['month'] == 'may').mean()*100:.1f}% de los registros corresponden "
+         "a mayo, pero con una tasa de conversión por debajo de la media. "
+         "Redistribuir el esfuerzo hacia meses de mayor efectividad histórica "
+         "(marzo, septiembre, octubre) podría recuperar puntos porcentuales perdidos."),
     ]
 
-    for c in conclusiones:
-        st.markdown(f"""
-        <div class="conclusion-box">
-        <b>Conclusión {c['num']}: {c['titulo']}</b><br><br>
-        {c['texto']}
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown("")
-
-    st.markdown("---")
-    st.markdown("### 🚀 Recomendaciones estratégicas")
-    cols = st.columns(3)
-    with cols[0]:
-        st.info("🎯 **Segmentación** — Enfocar campañas en jubilados y estudiantes")
-    with cols[1]:
-        st.info("📱 **Canal** — Priorizar contacto celular sobre teléfono fijo")
-    with cols[2]:
-        st.info("📅 **Timing** — Aprovechar períodos de euribor bajo para campañas")
-
-
-
+    for titulo, texto in conclusiones:
+        st.markdown(f"**{titulo}**")
+        st.write(texto)
+        st.markdown("---")
