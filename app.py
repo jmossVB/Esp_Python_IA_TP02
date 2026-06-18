@@ -176,9 +176,10 @@ if modulo == "🏠 Home":
  
     with col2:
         st.markdown("### 👤 Información Personal")
-        st.write("**Nombre:** Estudiante — Especialización Python for Analytics")
-        st.write("**Especialización:** Python for Analytics")
+        st.write("**Nombre:** José Alex Mosquera Amaro")
+        st.write("**Linkedin:** https://www.linkedin.com/in/josemosquera/")
         st.write("**Año:** 2026")
+
         st.markdown("---")
         st.markdown("**Instructor:** MSc. Carlos Carrillo Villavicencio")
  
